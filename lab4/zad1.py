@@ -5,7 +5,9 @@ import random
 
 
 def show_path(points, path):
-    x, y = zip(*points)
+    ordered = [points[i] for i in path]
+    ordered.append(ordered[0])
+    x, y = zip(*ordered)
     plt.scatter(x, y)
     plt.plot(x, y, linestyle="--")
     plt.show()
@@ -17,55 +19,54 @@ def show_prog(scores):
 
 
 def annealed_salesman(n):
-
-    def temp_fun(perm):
+    def obj_fun(perm):
         nonlocal points
         dist = 0
-        for i in range(len(perm) - 1):
-            x, y = perm[i], perm[i + 1]
+        for i in range(len(perm)):
+            x, y = perm[i], perm[(i + 1) % len(perm)]
             dist += math.dist(points[x], points[y])
         return dist
 
     def next_perm_smart(perm):
-        i = random.randrange(0, len(perm) - 1)
-        j = random.randrange(i + 1, len(perm))
-        perm[i], perm[j] = perm[j], perm[i]
-        return perm
+        new_perm = perm.copy()
+        i, j = random.sample(range(len(new_perm)), 2)
+        new_perm[i], new_perm[j] = new_perm[j], new_perm[i]
+        return new_perm
 
     def next_perm_stupid(perm):
         return np.random.permutation(perm)
 
-    def annealing(tempf, next_fun, n, temp, iters):
-        s_temp = temp
-        best = np.random.permutation(list(range(n)))
-        best_val = tempf(best)
+    def annealing(objf, next_fun, n, start_temp, iters):
+        best = np.random.permutation(n)
+        best_val = objf(best)
+
         current, current_eval = best, best_val
-        scores = [best_val]
+        scores = [current_eval]
+
         for i in range(iters):
-            temp = s_temp * (iters - i / iters)
+            temp = start_temp * ((iters - i) / iters) ** 2
 
-            next = next_fun(current)
-            next_eval = tempf(next)
+            candidate = next_fun(current)
+            candidate_eval = objf(candidate)
 
-            if next_eval < best_val or random.random() < math.exp(
-                (current_eval - next_eval) / temp
+            if candidate_eval < current_eval or random.random() < math.exp(
+                (current_eval - candidate_eval) / temp
             ):
+                current, current_eval = candidate, candidate_eval
 
-                current, current_eval = next, next_eval
-                if next_eval < best_val:
-                    best, best_eval = next, next_eval
-                    scores.append(best_eval)
+                if current_eval < best_val:
+                    best, best_val = current.copy(), current_eval
+
+            scores.append(current_eval)
 
         return best, best_val, scores
 
-    points = np.random.multivariate_normal([0, 0], [[50, 0], [0, 50]], n).T
-    points = list(zip(points[0], points[1]))
+    points = np.random.multivariate_normal([0, 0], [[50, 0], [0, 50]], n).tolist()
 
-    best_path, best_dist, scores = annealing(temp_fun, next_perm_stupid, n, 1000, 1000)
+    best_path, best_dist, scores = annealing(obj_fun, next_perm_smart, n, 10, 10000)
 
     show_path(points, best_path)
-
     show_prog(scores)
 
 
-annealed_salesman(100)
+annealed_salesman(20)
